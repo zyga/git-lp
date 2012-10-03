@@ -1,0 +1,28 @@
+=== modified file 'bzrlib/index.py'
+--- bzrlib/index.py	2011-12-19 13:23:58 +0000
++++ bzrlib/index.py	2012-10-02 23:04:47 +0000
+@@ -1500,6 +1500,7 @@
+         parent_map = {}
+         keys_to_lookup = set(keys)
+         generation = 0
++        from bzrlib.btree_index import BTreeBuilder
+         while keys_to_lookup:
+             # keys that *all* indexes claim are missing, stop searching them
+             generation += 1
+@@ -1509,6 +1510,15 @@
+             #                                   len(parent_map),
+             #                                   len(missing_keys))
+             for index_idx, index in enumerate(self._indices):
++                # Skip BTreeBuilder instances as ... they don't really
++                # implement _find_ancestors(). This is not a real fix as I
++                # don't understand bzr data model but at least it makes bzr
++                # fast-import work for me.
++                if isinstance(index, BTreeBuilder):
++                    trace.mutter("Skipping incompatible index %s", index)
++                    continue
++                else:
++                    trace.mutter("Looking in %s", index)
+                 # TODO: we should probably be doing something with
+                 #       'missing_keys' since we've already determined that
+                 #       those revisions have not been found anywhere
+

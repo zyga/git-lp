@@ -1,0 +1,714 @@
+#!/bin/bash
+# Copyright 2012 Canonical Ltd.
+# git-lp -- launchpad collaboration tool for git users
+# Written by Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
+
+gitlp_version='0.1'
+
+
+function gitlp_error() {
+echo "git-lp: error: $@"
+exit 1
+}
+
+
+function gitlp_print_version() {
+cat << EOM
+git-lp version $gitlp_version
+Copyright (C) Canonical Ltd, written by Zygmunt Krynicki
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOM
+}
+
+
+function gitlp_tutorial_help() {
+cat << EOM
+Usage: git lp tutorial
+
+Displays the tutorial on how to use git-lp
+EOM
+}
+
+
+function gitlp_tutorial() {
+cat << EOM
+git-lp is a tool that allows you to use git to work with Launchpad.net.
+
+This allows you to use git's advanced features such as history rewriting
+(squashing, reordering, editing the commit message, etc) that are not present
+in bzr.
+
+git-lp is not a general-purpose two-way sync tool. Instead it is a
+lone-collaborator tool where you interact with other project developers (who
+are using Launchpad/bzr) but can still work locally with git.
+
+Typical workflow:
+
+    # Create a new repository that for working with a single Launchpad.net project
+    $ git lp init checkbox && cd checkbox
+
+    # Get the initial code from Launchpad.net
+    # This can be accelerated if you have an existing bzr branch somewhere
+    # (pass the --cache option)
+    $ git lp fetch
+
+    # You can start working on a feature/bug in a branch
+    $ git lp branch feature-foo
+    # - Hack on your code
+    # - Commit with git
+    # - Rebase, squash, etc
+
+    # At any time you can push your branch to Launchpad for review
+    # This will push the code to lp:~yourlaunchpadusername/project/feature-foo
+    $ git lp push
+
+    # You may need to pass --overwrite to push if you've been rewriting history
+    $ git lp push --overwrite
+EOM
+}
+
+
+function gitlp_disclaimer_help() {
+cat << EOM
+Usage: git lp disclaimer 
+
+Displays important usage disclaimer
+EOM
+}
+
+
+function gitlp_disclaimer() {
+cat << EOM
+*** DISCLAIMER ***
+
+This depends on the following commands to operate correctly:
+  - bzr-fast{import,export}
+  - git-fast{import-export}
+
+I am unable to fix issues in either as I don't know the internal models of bzr
+If you know bzr internals, please look after lp:bzr-fastimport as it seems not
+to be maintained anymore.
+
+*** DISCLAIMER ***
+
+I wrote gitl-lp as I had issues with existing solutions of similar kind
+(git-bzr, git-bzr-ng) that tripped over bugs in bzr-fastimport. Over time I
+found a subset of operations that seems to work reliably _for me_.
+
+The limitations of this tool are as follows: 
+    - you can only work with one launchpad project per repo
+    - all feature branches _should_ be rebased on bzr trunk
+    - don't try any merges from git, it will likely fail
+
+The features offered are:
+    - you can have any number of local branches
+    - you can push any local branch to launchpad
+    - you can rewrite your branch up to the point where it branched off trunk
+      and still push that to launchpad (so code reviews this way can work okay)
+EOM
+}
+
+
+function gitlp_init_usage() {
+cat << EOM
+Usage: git lp init [--fetch] <project> [upstream-branch]
+EOM
+}
+
+
+function gitlp_init_help() {
+gitlp_init_usage
+cat << EOM
+
+Initialize a git repository for a project hosted on Launchpad.net
+
+Create a new git repository configured to work with an upstream project hosted
+on Launchpad.met. By default the project is branched from lp:project but you
+can provide an alternative branch.
+
+Normally this just sets the necessary meta-data. The actual heavy work is
+performed by 'git lp fetch'. You can combine both operations by passing the
+using 'git lp init --fetch ...' option.
+EOM
+}
+
+
+function gitlp_init() {
+local project=""
+local upstream_branch=""
+local fetch=""
+# Parse arguments
+while test -n "$1"; do
+    case "$1" in
+        --usage)
+            gitlp_init_usage
+            exit 0
+            ;;
+        -h|--help|-\?)
+            gitlp_init_help
+            exit 0
+            ;;
+        --fetch)
+            shift
+            fetch=1
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            gitlp_error "unsupported option: $1"
+            ;;
+        *)
+            test -z "$project" && project="$1" && shift && continue;
+            test -z "$upstream_branch" && upstream_branch="$1" && shift && continue;
+            gitlp_error "too many arguments"
+            ;;
+    esac
+done
+# Parse the reminder, after --
+while test -n "$1"; do
+    case "$1" in
+        *)
+            test -z "$project" && project="$1" && shift && continue;
+            test -z "$upstream_branch" && upstream_branch="$1" && shift && continue;
+            gitlp_error "too many arguments"
+            ;;
+    esac
+done
+if [ -z "$project" ]; then
+    gitlp_init_usage
+    exit 0
+fi
+# Upstream branch defaults to project development focus
+if [ -z "$upstream_branch" ]; then
+    upstream_branch="lp:$project"
+fi
+git init "$project"
+cd "$project"
+git config --local "launchpad.project" "$project"
+git config --local "launchpad.upstream-branch" "$upstream_branch"
+echo "Added meta-data to track '$project' from '$upstream_branch' on Launchpad.net"
+if [ "$fetch" = 1 ]; then
+    gitlp_fetch
+fi
+}
+
+
+function gitlp_ensure_tracked() {
+local project=$(git config --local --get launchpad.project)
+local upstream_branch=$(git config --local --get launchpad.upstream-branch)
+if [ -z "$project" ] || [ -z "$upstream_branch" ]; then
+    gitlp_error "This command requires a repository create with git lp init"
+fi
+}
+
+
+
+function gitlp_fetch_usage() {
+cat << EOM
+Usage: git lp fetch [options]
+EOM
+}
+
+
+function gitlp_fetch_help() {
+cat << EOM
+Usage: git lp fetch [options]
+
+Availalbe options:
+    --cache bzr-url: cache upstream repository with data from bzr-url
+
+Download project repository from Launchpad.net
+
+This command runs 'bzr pull' on the upstream branch of the tracked project.
+This is an incremental process that requires network connection. If it fails it
+should be possible to start it again safely. (the only exception is if you
+manually tamper with git-lp data or the upstream project rewrites its history).
+
+If the --cache option is used then initial fetch can complete faster by
+taking advantage of a (presumably local) repository from which bzr can copy the
+data.
+
+Once copied all new commits are exported from bzr and imported into git into
+the special repository launchpad/+upstream. This is a local process that can be
+re-started if necessary (as it depends on bug-free implementation of
+bzr-fastexport and git-fastimport).
+
+*NEVER* manally work with the special git branch launchpad/+upstream
+EOM
+}
+
+
+function gitlp_fetch() {
+# Lookup the bzr branch associated with the project
+local cache=""
+while test -n "$1"; do
+    case "$1" in
+        --usage)
+            gitlp_fetch_usage
+            exit 0
+            ;;
+        -h|--help|-\?)
+            gitlp_fetch_help
+            exit 0
+            ;;
+        -p|--cache)
+            cache="$2"
+            shift
+            test $# -gt 0 && shift
+            ;;
+        ^--$)
+            shift
+            break
+            ;;
+        -*)
+            gitlp_error "unsupported option: $1"
+            ;;
+        *)
+            gitlp_fetch_usage
+            gitlp_error "too many arguments"
+            ;;
+    esac
+done
+# Parse the reminder, after --
+while test -n "$1"; do
+    case "$1" in
+        *)
+            gitlp_error "too many arguments"
+            gitlp_fetch_usage
+            ;;
+    esac
+done
+# Ensure we have git+launchpad integration
+gitlp_ensure_tracked
+local project=$(git config --local --get launchpad.project)
+local upstream_branch=$(git config --local --get launchpad.upstream-branch)
+# Ensure we have a bzr repository
+if [ ! -e .git/launchpad/repo ]; then
+    bzr init-repo --quiet --no-trees .git/launchpad/repo \
+    || gitlp_error "bzr init-repo failed"
+fi
+# Track where we are
+local old_revno=0
+local new_revno=0
+# Branch the cache if requested
+if [ -n "$cache" ]; then
+    echo "Injecting Bazaar history from '$cache'" 
+    rm -rf .git/launchpad/repo/+cache
+    bzr branch --quiet $cache .git/launchpad/repo/+cache
+    rm -rf .git/launchpad/repo/+cache
+fi
+# Branch or pull the upstream branch 
+if [ ! -e .git/launchpad/repo/+upstream ]; then
+    echo "Branching Bazaar branch '$upstream_branch'"
+    if ! bzr branch --quiet $upstream_branch .git/launchpad/repo/+upstream; then
+        rm -rf .git/launchpad/repo/+upstream
+        gitlp_error "unable to bzr branch '$branch'"
+    fi
+    new_revno=$(bzr revno .git/launchpad/repo/+upstream)
+else
+    old_revno=$(bzr revno .git/launchpad/repo/+upstream)
+    echo "Pulling from Bazaar branch $upstream_branch"
+    if bzr pull --quiet --directory=.git/launchpad/repo/+upstream; then
+        new_revno=$(bzr revno .git/launchpad/repo/+upstream)
+        if [ $old_revno != $new_revno ]; then
+            echo "Bazaar upstream moved from revno:$old_revno to revno:$new_revno"
+        fi
+    else
+        gitlp_error "unable to pull from $upstream_branch"
+    fi
+fi
+if [ "$old_revno" != "$new_revno" ]; then
+    # Mirror everything into git 
+    echo "Exporting project history from Bazaar into Git..."
+    bzr fast-export \
+        --quiet \
+        --plain \
+        --marks .git/launchpad/bzr.+upstream.marks \
+        --git-branch launchpad/+upstream \
+        .git/launchpad/repo/+upstream 2>/dev/null \
+        | git fast-import \
+        --quiet \
+        --import-marks-if-exists=.git/launchpad/git.+upstream.marks \
+        --export-marks=.git/launchpad/git.+upstream.marks \
+        || gitlp_error "git fast-import failed"
+    # Checkout master when doing this for the first time 
+    if [ "$old_revno" -eq 0 ]; then
+        git branch master launchpad/+upstream
+    fi
+fi
+}
+
+
+function gitlp_branch_usage() {
+cat << EOM
+Usage: git lp branch [-c|--create] <branch>
+       git lp branch -d|--delete <branch>
+       git lp branch -l|--list [branch-pattern]
+EOM
+}
+
+
+function gitlp_branch_help() {
+gitlp_branch_usage
+cat << EOM
+
+Create, delete or list bzr branches.
+
+Listing branches (default if no other options are specified or when --list
+option was used) displays a tree of Launchpad projects that are being tracked
+along with the branches that have been created for them. If branch pattern is
+specified it can be used to narrow the listing.
+
+When creating branches (implicitly or when --create option was used), this
+command depends on 'git lp fetch' having been invoked at least once in the
+past. It will create a copy of certain data from the export/import system and
+clone the git branch 'launchpad/+upstream' to 'launchpad/branch'. This will be
+a normal, git branch that can be freely worked on.
+
+When deleting branches both git and bzr branches must exist (or the operation
+will be rejected). To remove normal git branches use 'git branch -d' as this
+solution has more safeguards built in. 
+EOM
+}
+
+
+function gitlp_branch() {
+local branch=""
+local mode=""
+local force_delete=""
+while test -n "$1"; do
+    case "$1" in
+        -h|--help|-\?)
+            gitlp_branch_help
+            exit 0
+            ;;
+        --usage)
+            gitlp_branch_usage
+            exit 0
+            ;;
+        -c|--create)
+            mode=create
+            shift
+            ;;
+        -D)
+            model=delete
+            force_delte=1
+            shift
+            ;;
+        -d|--delete)
+            mode=delete
+            shift
+            ;;
+        -l|--list)
+            mode=list
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            gitlp_error "unsupported option: $1"
+            ;;
+        *)
+            test -z "$branch" && branch="$1" && shift && continue;
+            gitlp_error "too many arguments: $1"
+            ;;
+    esac
+done
+# Parse the reminder, after --
+while test -n "$1"; do
+    case "$1" in
+        *)
+            test -z "$branch" && branch="$1" && shift && continue;
+            gitlp_error "too many arguments"
+            ;;
+    esac
+done
+# Ensure we have git+launchpad integration
+gitlp_ensure_tracked
+local project=$(git config --local --get launchpad.project)
+# When mode is empty but branch name is not, default to create mode
+test -z "$mode" && test -n "$branch" && mode="create"
+# When mode and branch name are both empty, default to list mode
+test -z "$mode" && test -z "$branch" && mode="list"
+# Ensure we have project and branch if we create/delete branches
+case "$mode" in
+    create|delete)
+        if [ -z "$project" ]; then
+            gitlp_error "you need to specify which project to branch"
+        fi
+        if [ -z "$branch" ]; then
+            gitlp_error "you need to specify the name of the new branch"
+        fi
+esac
+# Do what we were asked to do
+case "$mode" in
+    list)
+        local branch_path
+        local branch_name
+        local hidden=0
+        local shown=0
+        for branch_path in .git/launchpad/repo/*; do
+            branch_name=$(basename -- "$branch_path")
+            test "$branch_name" = "+upstream" && continue
+            if test -n "$branch" && ! echo "$branch_name" | grep --quiet "$branch" >/dev/null; then
+                hidden=$(expr $hidden + 1 )
+                continue
+            fi 
+            echo " * $branch_name"
+            shown=$(expr $shown + 1 )
+        done
+        if [ $shown -eq 0 ] && [ $hidden -gt 0 ]; then
+            echo "No branch has matched, $hidden branches"
+        elif [ $shown -eq 0 ] && [ $hidden -eq 0 ]; then
+            echo "you have no branches, use 'git lp branch' to create one"
+        fi
+        ;;
+    create)
+        # Ensure there is no bzr branch with that name
+        if [ -e .git/launchpad/repo/$branch ]; then
+            gitlp_error "bzr branch $branch already exists"
+        fi
+        # Ensure there is no git branch with that name
+        if [ "$(git branch --list "launchpad/$branch" | wc -l)" != 0 ]; then
+            gitlp_error "git branch launchpad/$branch already exists"
+        fi
+        # Branch the bzr version of the branch
+        if ! bzr branch --quiet ".git/launchpad/repo/+upstream" ".git/launchpad/repo/$branch"; then
+            rm -rf ".git/launchpad/repo/$branch"
+            rm -f ".git/launchpad/git.${branch}.marks"
+            rm -f ".git/launchpad/bzr.${branch}.marks"
+            gitlp_error "Unable to create bzr branch!"
+        fi
+        # Branch the git version of the branch
+        if ! git checkout -b "launchpad/$branch" "launchpad/+upstream"; then
+            git branch --delete --force "launchpad/$branch"
+            rm -rf -- ".git/launchpad/repo/$branch"
+            rm -f ".git/launchpad/git.${branch}.marks"
+            rm -f ".git/launchpad/bzr.${branch}.marks"
+            gitlp_error "Unable to create bzr branch!"
+        fi
+        # Copy mark files
+        cp ".git/launchpad/git.+upstream.marks" ".git/launchpad/git.${branch}.marks"
+        cp ".git/launchpad/bzr.+upstream.marks" ".git/launchpad/bzr.${branch}.marks"
+        ;;
+    delete)
+        # Ensure we're not removing the current branch 
+        local current_branch=$(git symbolic-ref --short -q HEAD)
+        if [ "$current_branch" = "launchpad/$branch" ]; then
+            gitlp_error "cannot remove current branch"
+        fi
+        # Ensure we're not removing the launchpad/+upstream branch
+        if [ "$branch" = "+upstream" ]; then
+            gitlp_error "cannot remove the special +upstream branch"
+        fi
+        # Ensure there _is_ a bzr branch with that name
+        if [ ! -e .git/launchpad/repo/$branch ]; then
+            gitlp_error "bzr branch '$branch' not found"
+        fi
+        # Ensure there _is_ a git branch with that name
+        if [ "$(git branch --list -- "launchpad/$branch" | wc -l)" != 1 ]; then
+            gitlp_error "git branch launchpad/$branch does not exist (consistency issue?)"
+        fi
+        # Remove git branch if we can 
+        git branch $(test "$force_delete" != "" && echo -D || echo -d) \
+            "launchpad/$branch"
+        # Remove the rest now
+        rm -rf ".git/launchpad/repo/$branch"
+        rm -f ".git/launchpad/git.${branch}.marks"
+        rm -f ".git/launchpad/bzr.${branch}.marks"
+        ;;
+esac
+}
+
+
+function gitlp_push_usage() {
+cat << EOM
+Usage: git lp push [--overwrite] [branch]
+EOM
+}
+
+
+function gitlp_push_help() {
+gitlp_push_usage
+cat << EOM
+
+Push a branch back to Launchpad.net
+EOM
+}
+
+
+function gitlp_push() {
+local branch=""
+local overwrite=""
+while test -n "$1"; do
+    case "$1" in
+        -h|--help|-\?)
+            gitlp_push_help
+            exit 0
+            ;;
+        --usage)
+            gitlp_push_usage
+            exit 0
+            ;;
+        --overwrite)
+            overwrite=1
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            gitlp_error "unsupported option: $1"
+            ;;
+        *)
+            test -z "$branch" && branch="$1" && shift && continue;
+            gitlp_error "too many arguments: $1"
+            ;;
+    esac
+done
+# Parse the reminder, after --
+while test -n "$1"; do
+    case "$1" in
+        *)
+            test -z "$branch" && branch="$1" && shift && continue;
+            gitlp_error "too many arguments"
+            ;;
+    esac
+done
+# Ensure we have git+launchpad integration
+gitlp_ensure_tracked
+local project=$(git config --local --get launchpad.project)
+# Assume current branch unless told otherwise
+if [ -z "$branch" ]; then
+    branch=$(git symbolic-ref --short -q HEAD)
+    if [ -z "$branch" ]; then
+        gitlp_error "unable to guess branch (no current branch)"
+    fi
+    branch="${branch##launchpad/}"
+    if [ -z "$branch" ]; then
+        gitlp_error "only launchpad/* branches are supported"
+    fi
+fi
+echo "Exporting Git '$branch' to Bazaar"
+git fast-export \
+    -M \
+    --import-marks=.git/launchpad/git.${branch}.marks \
+    --export-marks=.git/launchpad/git.${branch}.marks \
+    launchpad/+upstream..launchpad/$branch \
+    2>/dev/null \
+| bzr fast-import \
+    --quiet \
+    --import-marks=.git/launchpad/bzr.${branch}.marks \
+    --export-marks=.git/launchpad/bzr.${branch}.marks \
+    - \
+    .git/launchpad/repo/$branch 2>/dev/null
+local full_lp_branch="lp:~$(bzr lp-login)/$project/$branch"
+echo "Pushing Bazaar branch '$branch' to Launchpad.net '$full_lp_branch'"
+bzr push \
+    --directory=.git/launchpad/repo/$branch \
+    --no-remember \
+    $(test -n "$overwrite" && echo --overwrite) \
+    $full_lp_branch
+}
+
+
+function gitlp_help() {
+cmd=$1
+
+case $cmd in
+    init|fetch|branch|push)
+        gitlp_${cmd}_help
+        ;;
+    *)
+        echo "Note: There is no help for command $cmd"
+        echo
+        gitlp_help_all
+        exit 1
+        ;;
+esac
+}
+
+
+function gitlp_help_all() {
+cat << EOM
+Usage: git lp <command> [arguments]
+
+Commands: (read both at least once)
+
+    disclaimer  Read about the gotchas
+    tutorial    Learn how to use git-lp quickly!
+
+Commands:
+
+    init        Create a repository for working with a Launchpad.net project
+    fetch       Fetch changes from launchpad/+upstream
+    branch      Create new local launchpad/ branch
+    push        Push current launchpad/ branch to Launchpad.net
+EOM
+}
+
+
+function gitlp_main() {
+cmd="$1"
+shift
+# Dispatch the command
+case "$cmd" in
+    ''|help|-h|--help|-\?)
+        gitlp_help_all
+        exit 0
+        ;;
+    version|--version)
+        gitlp_print_version
+        exit 0
+        ;;
+    --manpage)
+        # Generate man page from help.
+        # Requires help2man, not intended for end users.
+        help2man -N $0
+        exit 0
+        ;;
+    --)
+        shift
+        ;;
+    -*)
+        gitlp_error "unsupported option: $cmd"
+        ;;
+    tutorial|disclaimer|init|fetch|branch|push)
+        # Peek if the user passed --help as the first argument
+        # If not then just run the command normally
+        case "$1" in 
+            -h|--help|-\?)
+                gitlp_${cmd}_help
+                ;;
+            *)
+                # Check if the command needs to be in a git repository
+                # If so, relocate to the directory with .git
+                case $cmd in
+                    help|tutorial|disclaimer|init)
+                        ;;
+                    *)
+                        up="$(git rev-parse --show-cdup)"
+                        if [ $? -ne 0 ]; then
+                            gitlp_error "must be inside git repository"
+                        fi
+                        test -n "$up" && cd "$up"
+                        ;;
+                esac
+                gitlp_$cmd "$@"
+                ;;
+        esac
+        ;;
+    *)
+        gitlp_error "unknown command: $cmd, maybe try 'git lp help'"
+        ;;
+esac
+}
+
+
+gitlp_main "$@"
