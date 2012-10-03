@@ -2,6 +2,7 @@
 # Copyright 2012 Canonical Ltd.
 # git-lp -- launchpad collaboration tool for git users
 # Written by Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
+# Licensed under 3-clause BSD license, see COPYING for details
 
 gitlp_version='0.1'
 
