@@ -33,7 +33,7 @@
 
 <h1>Tutorial</h1>
 
-<p>Create a new repository that for working with a single Launchpad.net project:</p>
+<p>Create a new repository for working with a single Launchpad.net project:</p>
 
 <pre><code>$ git lp init checkbox &amp;&amp; cd checkbox
 </code></pre>
@@ -44,7 +44,7 @@ existing bzr branch somewhere (pass the --cache option)</p>
 <pre><code>$ git lp fetch
 </code></pre>
 
-<p>You can start working on a feature/bug in a branch</p>
+<p>Start working on a feature/bug in a dedicated branch:</p>
 
 <pre><code>$ git lp branch feature-foo
 </code></pre>
@@ -55,31 +55,39 @@ existing bzr branch somewhere (pass the --cache option)</p>
 <li>Hack on your code</li>
 <li>Commit with git</li>
 <li>Rebase, squash, etc</li>
-</ul><p>At any time you can push your branch to Launchpad for review
-This will push the code to lp:~yourlaunchpadusername/project/feature-foo</p>
+</ul><p>At any time you can push your branch to Launchpad.net for reviews. This will
+push the code to lp:~yourlaunchpadusername/project/feature-foo.</p>
 
 <pre><code>$ git lp push
 </code></pre>
 
-<p>You may need to pass --overwrite to push if you've been rewriting history</p>
+<p>You can easily react to review feedback: commit new patches, rework and amend
+existing patches, anything that you want to. Once you are ready share your code
+again just run push again. You may need to pass --overwrite to push if you've
+been rewriting history though (but that is okay as you're working on a merge
+request and it has not yet landed)</p>
 
 <pre><code>$ git lp push --overwrite
 </code></pre>
 
 <h1>Installation</h1>
 
+<p>This has been tested on Ubuntu 12.10 Quantal with bzr trunk but I believe it
+should apply cleanly to packaged versions as well.</p>
+
 <ol>
 <li>Download <a href="https://raw.github.com/zyga/git-lp/master/bzr.patch">https://raw.github.com/zyga/git-lp/master/bzr.patch</a> </li>
 <li>
 <p>Apply it to your system (reinstall bzr to revert)</p>
 
-<p>You may want to read the outcome of this merge request
-to know if this patch has been accepted or well reviewed
-by the Bazaar maintainers.</p>
+<p>You may want to read the outcome of this merge request to know if this
+patch has been accepted or well reviewed by the Bazaar maintainers. Once
+this is fixed then you won't have to patch your bzr anymore obviously.</p>
 
 <p><a href="https://code.launchpad.net/%7Ezkrynicki/bzr/find_ancestors/+merge/127610">https://code.launchpad.net/~zkrynicki/bzr/find_ancestors/+merge/127610</a></p>
 </li>
-<li><p>Put git-lp somewhere in your PATH</p></li>
+<li><p>Put git-lp (<a href="https://raw.github.com/zyga/git-lp/master/git-lp">https://raw.github.com/zyga/git-lp/master/git-lp</a>) somewhere in
+your PATH.</p></li>
 </ol>
       </section>
     </div>
