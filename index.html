@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Git-lp by zyga</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Git-lp</h1>
+        <p>Launchpad collaboration tool for git users</p>
+        <p class="view"><a href="https://github.com/zyga/git-lp">View the Project on GitHub <small>zyga/git-lp</small></a></p>
+        <ul>
+          <li><a href="https://github.com/zyga/git-lp/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/zyga/git-lp/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/zyga/git-lp">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>About</h1>
+
+<p>git-lp is a tool that allows you to use git to work with Launchpad.net.</p>
+
+<h1>Tutorial</h1>
+
+<p>Create a new repository that for working with a single Launchpad.net project:</p>
+
+<pre><code>$ git lp init checkbox &amp;&amp; cd checkbox
+</code></pre>
+
+<p>Get the initial code from Launchpad.net. This can be accelerated if you have an
+existing bzr branch somewhere (pass the --cache option)</p>
+
+<pre><code>$ git lp fetch
+</code></pre>
+
+<p>You can start working on a feature/bug in a branch</p>
+
+<pre><code>$ git lp branch feature-foo
+</code></pre>
+
+<p>While you want:</p>
+
+<ul>
+<li>Hack on your code</li>
+<li>Commit with git</li>
+<li>Rebase, squash, etc</li>
+</ul><p>At any time you can push your branch to Launchpad for review
+This will push the code to lp:~yourlaunchpadusername/project/feature-foo</p>
+
+<pre><code>$ git lp push
+</code></pre>
+
+<p>You may need to pass --overwrite to push if you've been rewriting history</p>
+
+<pre><code>$ git lp push --overwrite
+</code></pre>
+
+<h1>Installation</h1>
+
+<ol>
+<li>Download <a href="https://raw.github.com/zyga/git-lp/master/bzr.patch">https://raw.github.com/zyga/git-lp/master/bzr.patch</a> </li>
+<li>
+<p>Apply it to your system (reinstall bzr to revert)</p>
+
+<p>You may want to read the outcome of this merge request
+to know if this patch has been accepted or well reviewed
+by the Bazaar maintainers.</p>
+
+<p><a href="https://code.launchpad.net/%7Ezkrynicki/bzr/find_ancestors/+merge/127610">https://code.launchpad.net/~zkrynicki/bzr/find_ancestors/+merge/127610</a></p>
+</li>
+<li><p>Put git-lp somewhere in your PATH</p></li>
+</ol>
+      </section>
+    </div>
+    <footer>
+      <p>Project maintained by <a href="https://github.com/zyga">zyga</a></p>
+      <p>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></p>
+    </footer>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+    
+  </body>
+</html>
