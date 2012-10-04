@@ -4,7 +4,7 @@
 # Written by Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
 # Licensed under 3-clause BSD license, see COPYING for details
 
-gitlp_version='0.1'
+gitlp_version='0.1.1'
 
 
 function gitlp_error() {
