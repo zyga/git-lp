@@ -599,14 +599,12 @@ fi
 echo "Exporting Git '$branch' to Bazaar"
 git fast-export \
     -M \
-    --import-marks=.git/launchpad/git.${branch}.marks \
-    --export-marks=.git/launchpad/git.${branch}.marks \
+    --import-marks=.git/launchpad/git.+upstream.marks \
     launchpad/+upstream..launchpad/$branch \
     2>/dev/null \
 | bzr fast-import \
     --quiet \
-    --import-marks=.git/launchpad/bzr.${branch}.marks \
-    --export-marks=.git/launchpad/bzr.${branch}.marks \
+    --import-marks=.git/launchpad/bzr.+upstream.marks \
     - \
     .git/launchpad/repo/$branch 2>/dev/null
 local full_lp_branch="lp:~$(bzr lp-login)/$project/$branch"
