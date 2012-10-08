@@ -182,6 +182,9 @@ if [ -z "$project" ]; then
     gitlp_init_usage
     exit 0
 fi
+# Try to prevent wrong things from happening when someone
+# passes 'lp:project' instead of plain 'project'
+project=${project##lp:}
 # Upstream branch defaults to project development focus
 if [ -z "$upstream_branch" ]; then
     upstream_branch="lp:$project"
