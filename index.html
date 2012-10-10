@@ -4,36 +4,53 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
     <title>git-lp by zyga</title>
-
     <link rel="stylesheet" href="stylesheets/styles.css">
     <link rel="stylesheet" href="stylesheets/pygment_trac.css">
-    <script src="javascripts/scale.fix.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
   </head>
   <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/zyga/git-lp">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/zyga/git-lp/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/zyga/git-lp/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
     <div class="wrapper">
-      <header>
-        <h1>git-lp</h1>
-        <p>Launchpad.net collaboration tool for git users</p>
-        <p class="view"><a href="https://github.com/zyga/git-lp">View the Project on GitHub <small>zyga/git-lp</small></a></p>
-        <ul>
-          <li><a href="https://github.com/zyga/git-lp/zipball/master">Download <strong>ZIP File</strong></a></li>
-          <li><a href="https://github.com/zyga/git-lp/tarball/master">Download <strong>TAR Ball</strong></a></li>
-          <li><a href="https://github.com/zyga/git-lp">View On <strong>GitHub</strong></a></li>
-        </ul>
-      </header>
+
       <section>
+        <div id="title">
+          <h1>git-lp</h1>
+          <p>Launchpad.net collaboration tool for git users</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/zyga">zyga</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="http://twitter.com/#!/michigangraham">mattgraham</a></span>
+        </div>
+
         <h1>About</h1>
 
 <p>git-lp is a tool that allows you to use git to work with Launchpad.net.</p>
 
 <h1>Tutorial</h1>
 
-<p>Create a new repository for working with a single Launchpad.net project:</p>
+<p>Make sure to see the tutorial that is built right into git-lp with:</p>
+
+<pre><code>$ git lp tutorial
+</code></pre>
+
+<p>Now back to the web edition! Create a new repository for working with
+a single Launchpad.net project:</p>
 
 <pre><code>$ git lp init checkbox &amp;&amp; cd checkbox
 </code></pre>
@@ -90,11 +107,8 @@ this is fixed then you won't have to patch your bzr anymore obviously.</p>
 your PATH.</p></li>
 </ol>
       </section>
+
     </div>
-    <footer>
-      <p>Project maintained by <a href="https://github.com/zyga">zyga</a></p>
-      <p>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></p>
-    </footer>
     <!--[if !IE]><script>fixScale(document);</script><![endif]-->
     
   </body>
