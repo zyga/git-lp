@@ -54,3 +54,4 @@ should apply cleanly to packaged versions as well.
 
 3. Put git-lp (https://raw.github.com/zyga/git-lp/master/git-lp) somewhere in
    your PATH.
+4. Install bzr-fastexport (sudo apt-get install bzr-fastexport)
