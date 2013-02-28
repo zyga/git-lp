@@ -4,7 +4,7 @@
 # Written by Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
 # Licensed under 3-clause BSD license, see COPYING for details
 
-gitlp_version='0.1.2'
+gitlp_version='0.1.3'
 
 
 function gitlp_error() {
@@ -502,7 +502,7 @@ case "$mode" in
         ;;
     delete)
         # Ensure we're not removing the current branch 
-        local current_branch=$(git symbolic-ref -q HEAD | sed -e 's!/^refs/heads/!!' )
+        local current_branch=$(git symbolic-ref -q HEAD | sed -e 's!^refs/heads/!!' )
         if [ "$current_branch" = "launchpad/$branch" ]; then
             gitlp_error "cannot remove current branch"
         fi
@@ -590,7 +590,7 @@ gitlp_ensure_tracked
 local project=$(git config --local --get launchpad.project)
 # Assume current branch unless told otherwise
 if [ -z "$branch" ]; then
-    branch=$(git symbolic-ref -q HEAD | sed -e 's!/^refs/heads/!!' )
+    branch=$(git symbolic-ref -q HEAD | sed -e 's!^refs/heads/!!' )
     if [ -z "$branch" ]; then
         gitlp_error "unable to guess branch (no current branch)"
     fi
