@@ -620,6 +620,27 @@ bzr push \
 }
 
 
+function gitlp_patch() {
+cat << EOM
+To patch bzr execute the following command as root.
+You will need to locate the bzr.patch file yourself
+Note: the argument to -i must be an absolute path
+
+patch -d /usr/share/pyshared/ -i /path/to/bzr.patch
+EOM
+}
+
+
+function gitlp_patch_help() {
+cat << EOM
+Usage: git lp patch
+
+This command instructs how to apply the bzr.patch
+file on top of the existing bzr installation.
+EOM
+}
+
+
 function gitlp_help() {
 cmd=$1
 
@@ -652,6 +673,7 @@ Commands:
     fetch       Fetch changes from launchpad/+upstream
     branch      Create new local launchpad/ branch
     push        Push current launchpad/ branch to Launchpad.net
+    patch       Patch bzr to work with git-lp
 EOM
 }
 
@@ -681,7 +703,7 @@ case "$cmd" in
     -*)
         gitlp_error "unsupported option: $cmd"
         ;;
-    tutorial|disclaimer|init|fetch|branch|push)
+    tutorial|disclaimer|init|fetch|branch|push|patch)
         # Peek if the user passed --help as the first argument
         # If not then just run the command normally
         case "$1" in 
@@ -692,7 +714,7 @@ case "$cmd" in
                 # Check if the command needs to be in a git repository
                 # If so, relocate to the directory with .git
                 case $cmd in
-                    help|tutorial|disclaimer|init)
+                    help|tutorial|disclaimer|init|patch)
                         ;;
                     *)
                         up="$(git rev-parse --show-cdup)"
