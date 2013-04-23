@@ -66,6 +66,16 @@ Typical workflow:
 
     # You may need to pass --overwrite to push if you've been rewriting history
     $ git lp push --overwrite
+
+    # After ther branch is merged upstream (for example, by using tarmac) you
+    # can remove the your local branch. You need to use -D as bzr merges don't
+    # record well in git and apparently git is unable to determine that.
+    $ git branch -D feature-foo
+
+    # To prevent hidden meta-data from piling up use the garbage-collect
+    # command. Pass the --remove option to actually remove stuff from your
+    # filesystem.
+    $ git lp gc --remove
 EOM
 }
 
@@ -514,6 +524,9 @@ case "$mode" in
         if [ ! -e .git/launchpad/repo/$branch ]; then
             gitlp_error "bzr branch '$branch' not found"
         fi
+        echo "Note that manually deleting bzr branches is not very convenient"
+        echo "You should forcibly remove them with git branch -D and then use"
+        echo "git lp gc --remove --optimize (once in a while)"
         # Ensure there _is_ a git branch with that name
         if [ "$(git branch --list -- "launchpad/$branch" | wc -l)" != 1 ]; then
             gitlp_error "git branch launchpad/$branch does not exist (consistency issue?)"
@@ -652,6 +665,7 @@ Commands:
     fetch       Fetch changes from launchpad/+upstream
     branch      Create new local launchpad/ branch
     push        Push current launchpad/ branch to Launchpad.net
+    gc          Remove unused bzr branches and meta-data
 EOM
 }
 
@@ -680,6 +694,24 @@ case "$cmd" in
         ;;
     -*)
         gitlp_error "unsupported option: $cmd"
+        ;;
+    gc)
+        # Ensure we have gitflow-shFlags available
+        if [ ! -e /usr/lib/git-core/gitflow-shFlags ]; then
+            gitlp_error "To use this command you need to install git-flow"
+        fi
+        # This environmental variable fixes non-POSIX getopt style argument
+        # parsing, effectively breaking git-flow subcommand parsing on several
+        # Linux platforms.
+        export POSIXLY_CORRECT=1
+        # Load the shFlags library
+        . /usr/lib/git-core/gitflow-shFlags
+        # Prime shFlags for the command at hand
+        FLAGS_PARENT="git lp $cmd"
+        gitlp_${cmd}_flags
+        FLAGS "$@" || exit $?
+        eval set -- "${FLAGS_ARGV}"
+        gitlp_${cmd}
         ;;
     tutorial|disclaimer|init|fetch|branch|push)
         # Peek if the user passed --help as the first argument
@@ -710,6 +742,63 @@ case "$cmd" in
         gitlp_error "unknown command: $cmd, maybe try 'git lp help'"
         ;;
 esac
+}
+
+
+function gitlp_gc_flags() {
+    DEFINE_boolean remove 'false' 'Remove unused bzr branches' r
+    DEFINE_boolean optimize 'false' 'Discard unused revisions from bzr repository' o
+}
+
+
+function gitlp_gc_help() {
+    flags_help
+cat << EOM
+
+Garbage collect unused bzr branches and associated meta-data.
+
+If --remove is passed the actual branches and meta-data files are removed from
+the filesystem. This is the actual way to reclaim space.
+
+If --optimize is passed then bzr shared repository that technically keeps the
+contents of all revisions that bzr ever saw is also garbage collected. This
+reclaims space by removing unused revisions from that repository.
+EOM
+}
+
+
+function gitlp_gc() {
+    # Load git-flow common library
+    . /usr/lib/git-core/gitflow-common
+    # Ensure that we are in a .git managed directory
+    require_git_repo
+    echo "Looking for unused bzr branches..."
+    git_dir=$(git rev-parse --git-dir)
+    # Find any bzr branches that exist in 'launchpad/repo'
+    for bzr_branch in $(cd $git_dir/launchpad/repo && bzr branches --recursive); do
+        # bzr seems to escape '+'
+        # anyway, we _really_ want to preserve this one
+        if [ "$bzr_branch" = "%2Bupstream" -o "$bzr_branch" = "+upstream" ]; then
+            continue
+        fi
+        # Check if this branch has a git counterpart
+        if ! git_local_branches | grep --fixed-string --line-regexp "launchpad/$bzr_branch" >/dev/null; then
+            # Remove it if that's what was asked
+            if [ ${FLAGS_remove} -eq ${FLAGS_TRUE} ]; then
+                rm -rf "$git_dir/launchpad/repo/$bzr_branch"
+                rm -f "$git_dir/launchpad/git.$bzr_branch.marks"
+                rm -f "$git_dir/launchpad/bzr.$bzr_branch.marks"
+                echo "- $bzr_branch (removed)"
+            else
+                echo "- $bzr_branch"
+            fi
+        fi
+    done
+    # Repack bzr if requested
+    if [ ${FLAGS_optimize} -eq ${FLAGS_TRUE} ]; then
+        echo "Optimizing bzr shared repository..."
+        ( cd $git_dir/launchpad/repo && bzr pack --quiet)
+    fi
 }
 
 
