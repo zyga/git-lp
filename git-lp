@@ -66,6 +66,12 @@ Typical workflow:
 
     # You may need to pass --overwrite to push if you've been rewriting history
     $ git lp push --overwrite
+
+    # This will open a browser page with your branch
+    $ git lp open
+
+    # When you're done with a branch and want to remove it
+    $ git lp branch -d feature-foo  # Note no launchpad/ prefix is needed
 EOM
 }
 
@@ -93,7 +99,7 @@ to be maintained anymore.
 
 *** DISCLAIMER ***
 
-I wrote gitl-lp as I had issues with existing solutions of similar kind
+I wrote git-lp as I had issues with existing solutions of similar kind
 (git-bzr, git-bzr-ng) that tripped over bugs in bzr-fastimport. Over time I
 found a subset of operations that seems to work reliably _for me_.
 
@@ -620,6 +626,43 @@ bzr push \
 }
 
 
+function get_full_branch() {
+# Ensure we have git+launchpad integration
+gitlp_ensure_tracked
+local project=$(git config --local --get launchpad.project)
+local branch=$(git symbolic-ref -q HEAD | sed -e 's!^refs/heads/!!' )
+if [ -z "$branch" ]; then
+    gitlp_error "unable to guess branch (no current branch)"
+fi
+branch="${branch##launchpad/}"
+if [ -z "$branch" ]; then
+    gitlp_error "only launchpad/* branches are supported"
+fi
+local full_lp_branch="lp:~$(bzr lp-login)/$project/$branch"
+echo $full_lp_branch
+}
+
+
+function gitlp_open_usage() {
+cat << EOM
+Usage: git lp open
+EOM
+}
+
+
+function gitlp_open_help() {
+gitlp_open_usage
+cat << EOM
+
+Open Launchpad branch web page for the current branch on your browser.
+EOM
+}
+
+
+function gitlp_open() {
+local full_lp_branch=$(get_full_branch)
+bzr lp-open $full_lp_branch
+}
 function gitlp_help() {
 cmd=$1
 
@@ -681,6 +724,7 @@ case "$cmd" in
     -*)
         gitlp_error "unsupported option: $cmd"
         ;;
+    tutorial|disclaimer|init|fetch|branch|push|open)
     tutorial|disclaimer|init|fetch|branch|push)
         # Peek if the user passed --help as the first argument
         # If not then just run the command normally
