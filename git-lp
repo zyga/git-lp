@@ -639,7 +639,7 @@ To patch bzr execute the following command as root.
 You will need to locate the bzr.patch file yourself
 Note: the argument to -i must be an absolute path
 
-patch -d /usr/share/pyshared/ -i /path/to/bzr.patch
+patch -p0 -d /usr/share/pyshared/ -i /path/to/bzr.patch
 EOM
 }
 
