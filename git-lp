@@ -1,10 +1,10 @@
 #!/bin/bash
-# Copyright 2012 Canonical Ltd.
+# Copyright 2012, 2013 Canonical Ltd.
 # git-lp -- launchpad collaboration tool for git users
 # Written by Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
 # Licensed under 3-clause BSD license, see COPYING for details
 
-gitlp_version='0.1.3'
+gitlp_version='0.2'
 
 
 function gitlp_error() {
@@ -66,6 +66,16 @@ Typical workflow:
 
     # You may need to pass --overwrite to push if you've been rewriting history
     $ git lp push --overwrite
+
+    # After ther branch is merged upstream (for example, by using tarmac) you
+    # can remove the your local branch. You need to use -D as bzr merges don't
+    # record well in git and apparently git is unable to determine that.
+    $ git branch -D feature-foo
+
+    # To prevent hidden meta-data from piling up use the garbage-collect
+    # command. Pass the --remove option to actually remove stuff from your
+    # filesystem.
+    $ git lp gc --remove
 EOM
 }
 
@@ -514,6 +524,9 @@ case "$mode" in
         if [ ! -e .git/launchpad/repo/$branch ]; then
             gitlp_error "bzr branch '$branch' not found"
         fi
+        echo "Note that manually deleting bzr branches is not very convenient"
+        echo "You should forcibly remove them with git branch -D and then use"
+        echo "git lp gc --remove --optimize (once in a while)"
         # Ensure there _is_ a git branch with that name
         if [ "$(git branch --list -- "launchpad/$branch" | wc -l)" != 1 ]; then
             gitlp_error "git branch launchpad/$branch does not exist (consistency issue?)"
@@ -620,6 +633,27 @@ bzr push \
 }
 
 
+function gitlp_patch() {
+cat << EOM
+To patch bzr execute the following command as root.
+You will need to locate the bzr.patch file yourself
+Note: the argument to -i must be an absolute path
+
+patch -p0 -d /usr/share/pyshared/ -i /path/to/bzr.patch
+EOM
+}
+
+
+function gitlp_patch_help() {
+cat << EOM
+Usage: git lp patch
+
+This command instructs how to apply the bzr.patch
+file on top of the existing bzr installation.
+EOM
+}
+
+
 function gitlp_help() {
 cmd=$1
 
@@ -652,6 +686,12 @@ Commands:
     fetch       Fetch changes from launchpad/+upstream
     branch      Create new local launchpad/ branch
     push        Push current launchpad/ branch to Launchpad.net
+    gc          Remove unused bzr branches and meta-data
+    rebase      Rebase on +upstream and update internal meta-data
+
+Special commands:
+
+    patch       Patch bzr to work with git-lp
 EOM
 }
 
@@ -681,7 +721,25 @@ case "$cmd" in
     -*)
         gitlp_error "unsupported option: $cmd"
         ;;
-    tutorial|disclaimer|init|fetch|branch|push)
+    gc|rebase)
+        # Ensure we have gitflow-shFlags available
+        if [ ! -e /usr/lib/git-core/gitflow-shFlags ]; then
+            gitlp_error "To use this command you need to install git-flow"
+        fi
+        # This environmental variable fixes non-POSIX getopt style argument
+        # parsing, effectively breaking git-flow subcommand parsing on several
+        # Linux platforms.
+        export POSIXLY_CORRECT=1
+        # Load the shFlags library
+        . /usr/lib/git-core/gitflow-shFlags
+        # Prime shFlags for the command at hand
+        FLAGS_PARENT="git lp $cmd"
+        gitlp_${cmd}_flags
+        FLAGS "$@" || exit $?
+        eval set -- "${FLAGS_ARGV}"
+        gitlp_${cmd}
+        ;;
+    tutorial|disclaimer|init|fetch|branch|push|patch)
         # Peek if the user passed --help as the first argument
         # If not then just run the command normally
         case "$1" in 
@@ -692,7 +750,7 @@ case "$cmd" in
                 # Check if the command needs to be in a git repository
                 # If so, relocate to the directory with .git
                 case $cmd in
-                    help|tutorial|disclaimer|init)
+                    help|tutorial|disclaimer|init|patch)
                         ;;
                     *)
                         up="$(git rev-parse --show-cdup)"
@@ -710,6 +768,117 @@ case "$cmd" in
         gitlp_error "unknown command: $cmd, maybe try 'git lp help'"
         ;;
 esac
+}
+
+
+function gitlp_gc_flags() {
+    DEFINE_boolean remove 'false' 'Remove unused bzr branches' r
+    DEFINE_boolean optimize 'false' 'Discard unused revisions from bzr repository' o
+}
+
+
+function gitlp_gc_help() {
+    flags_help
+cat << EOM
+
+Garbage collect unused bzr branches and associated meta-data.
+
+If --remove is passed the actual branches and meta-data files are removed from
+the filesystem. This is the actual way to reclaim space.
+
+If --optimize is passed then bzr shared repository that technically keeps the
+contents of all revisions that bzr ever saw is also garbage collected. This
+reclaims space by removing unused revisions from that repository.
+EOM
+}
+
+
+function gitlp_gc() {
+    # Load git-flow common library
+    . /usr/lib/git-core/gitflow-common
+    # Ensure that we are in a .git managed directory
+    require_git_repo
+    echo "Looking for unused bzr branches..."
+    git_dir=$(git rev-parse --git-dir)
+    # Find any bzr branches that exist in 'launchpad/repo'
+    for bzr_branch in $(cd $git_dir/launchpad/repo && bzr branches --recursive); do
+        # bzr seems to escape '+'
+        # anyway, we _really_ want to preserve this one
+        if [ "$bzr_branch" = "%2Bupstream" -o "$bzr_branch" = "+upstream" ]; then
+            continue
+        fi
+        # Check if this branch has a git counterpart
+        if ! git_local_branches | grep --fixed-string --line-regexp "launchpad/$bzr_branch" >/dev/null; then
+            # Remove it if that's what was asked
+            if [ ${FLAGS_remove} -eq ${FLAGS_TRUE} ]; then
+                rm -rf "$git_dir/launchpad/repo/$bzr_branch"
+                rm -f "$git_dir/launchpad/git.$bzr_branch.marks"
+                rm -f "$git_dir/launchpad/bzr.$bzr_branch.marks"
+                echo "- $bzr_branch (removed)"
+            else
+                echo "- $bzr_branch"
+            fi
+        fi
+    done
+    # Repack bzr if requested
+    if [ ${FLAGS_optimize} -eq ${FLAGS_TRUE} ]; then
+        echo "Optimizing bzr shared repository..."
+        ( cd $git_dir/launchpad/repo && bzr pack --quiet)
+    fi
+}
+
+
+function gitlp_rebase_help() {
+cat << EOM
+Usage: git lp rebase
+
+This command rebases your current branch on top of launchpad/+upstream. After
+doing that, if successful, the marks files are copied from those in the
++upstream branch.
+
+This is important when exporting the git branch back to bzr. If done this way
+then only the part of the new history that is not in +upstream is actually
+exported. This helps avoid having to push with --overwrite, makes launchpad
+work faster (less commits to process) and is generally encouraged.
+EOM
+}
+
+function gitlp_rebase_flags() {
+    DEFINE_boolean interactive 'false' "Pass --interactive to git rebase" i
+}
+
+
+function gitlp_rebase() {
+    # Load git-flow common library
+    . /usr/lib/git-core/gitflow-common
+    # Ensure that we are in a .git managed directory
+    require_git_repo
+    local current_branch=$(git_current_branch)
+    # Ensure we are on a launchpad/ branch
+    if ! startswith "$current_branch" "launchpad/"; then
+        gitlp_error "This command requires you to be on a launchpad/ branch"
+    fi
+    # Strip the launchpad/ prefix
+    current_branch=${current_branch#launchpad/}
+    # Ensure we can attempt to rebase
+    if ! git_is_clean_working_tree; then
+        gitlp_error "The working tree is not clean, commit/stash your changes first"
+    fi
+    # Rebase now
+    if [ ${FLAGS_interactive} -eq ${FLAGS_TRUE} ]; then
+        local rebase_cmd="git rebase --interactive launchpad/+upstream"
+    else
+        local rebase_cmd="git rebase launchpad/+upstream"
+    fi
+    if $rebase_cmd; then
+        echo "copying marks files from +upstream to $current_branch"
+        git_dir=$(git rev-parse --git-dir)
+        cp -f "$git_dir/launchpad/bzr.+upstream.marks" "$git_dir/launchpad/bzr.$current_branch.marks"
+        cp -f "$git_dir/launchpad/git.+upstream.marks" "$git_dir/launchpad/git.$current_branch.marks"
+    else
+        echo "rebase failed, aborting"
+        git rebase --abort
+    fi
 }
 
 
