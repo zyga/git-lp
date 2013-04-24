@@ -729,6 +729,7 @@ Commands:
     push        Push current launchpad/ branch to Launchpad.net
     gc          Remove unused bzr branches and meta-data
     rebase      Rebase on +upstream and update internal meta-data
+    open        Open the current branch on Launchpad
 
 Special commands:
 
