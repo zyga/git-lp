@@ -509,6 +509,8 @@ case "$mode" in
             rm -f ".git/launchpad/bzr.${branch}.marks"
             gitlp_error "Unable to create bzr branch!"
         fi
+        # Set the upstream branch
+        git branch --set-upstream-to=launchpad/+upstream
         # Copy mark files
         cp ".git/launchpad/git.+upstream.marks" ".git/launchpad/git.${branch}.marks"
         cp ".git/launchpad/bzr.+upstream.marks" ".git/launchpad/bzr.${branch}.marks"
