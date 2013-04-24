@@ -687,6 +687,10 @@ Commands:
     branch      Create new local launchpad/ branch
     push        Push current launchpad/ branch to Launchpad.net
     gc          Remove unused bzr branches and meta-data
+    rebase      Rebase on +upstream and update internal meta-data
+
+Special commands:
+
     patch       Patch bzr to work with git-lp
 EOM
 }
@@ -717,7 +721,7 @@ case "$cmd" in
     -*)
         gitlp_error "unsupported option: $cmd"
         ;;
-    gc)
+    gc|rebase)
         # Ensure we have gitflow-shFlags available
         if [ ! -e /usr/lib/git-core/gitflow-shFlags ]; then
             gitlp_error "To use this command you need to install git-flow"
@@ -820,6 +824,60 @@ function gitlp_gc() {
     if [ ${FLAGS_optimize} -eq ${FLAGS_TRUE} ]; then
         echo "Optimizing bzr shared repository..."
         ( cd $git_dir/launchpad/repo && bzr pack --quiet)
+    fi
+}
+
+
+function gitlp_rebase_help() {
+cat << EOM
+Usage: git lp rebase
+
+This command rebases your current branch on top of launchpad/+upstream. After
+doing that, if successful, the marks files are copied from those in the
++upstream branch.
+
+This is important when exporting the git branch back to bzr. If done this way
+then only the part of the new history that is not in +upstream is actually
+exported. This helps avoid having to push with --overwrite, makes launchpad
+work faster (less commits to process) and is generally encouraged.
+EOM
+}
+
+function gitlp_rebase_flags() {
+    DEFINE_boolean interactive 'false' "Pass --interactive to git rebase" i
+}
+
+
+function gitlp_rebase() {
+    # Load git-flow common library
+    . /usr/lib/git-core/gitflow-common
+    # Ensure that we are in a .git managed directory
+    require_git_repo
+    local current_branch=$(git_current_branch)
+    # Ensure we are on a launchpad/ branch
+    if ! startswith "$current_branch" "launchpad/"; then
+        gitlp_error "This command requires you to be on a launchpad/ branch"
+    fi
+    # Strip the launchpad/ prefix
+    current_branch=${current_branch#launchpad/}
+    # Ensure we can attempt to rebase
+    if ! git_is_clean_working_tree; then
+        gitlp_error "The working tree is not clean, commit/stash your changes first"
+    fi
+    # Rebase now
+    if [ ${FLAGS_interactive} -eq ${FLAGS_TRUE} ]; then
+        local rebase_cmd="git rebase --interactive launchpad/+upstream"
+    else
+        local rebase_cmd="git rebase launchpad/+upstream"
+    fi
+    if $rebase_cmd; then
+        echo "copying marks files from +upstream to $current_branch"
+        git_dir=$(git rev-parse --git-dir)
+        cp -f "$git_dir/launchpad/bzr.+upstream.marks" "$git_dir/launchpad/bzr.$current_branch.marks"
+        cp -f "$git_dir/launchpad/git.+upstream.marks" "$git_dir/launchpad/git.$current_branch.marks"
+    else
+        echo "rebase failed, aborting"
+        git rebase --abort
     fi
 }
 
