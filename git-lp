@@ -510,7 +510,8 @@ case "$mode" in
             gitlp_error "Unable to create bzr branch!"
         fi
         # Set the upstream branch
-        git branch --set-upstream-to=launchpad/+upstream
+        # TODO: --set-upstream is deprecated and will be replaced by --set-upstream-to
+        git branch --set-upstream "launchpad/$branch" launchpad/+upstream 2>/dev/null
         # Copy mark files
         cp ".git/launchpad/git.+upstream.marks" ".git/launchpad/git.${branch}.marks"
         cp ".git/launchpad/bzr.+upstream.marks" ".git/launchpad/bzr.${branch}.marks"
