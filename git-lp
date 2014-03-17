@@ -236,6 +236,7 @@ Usage: git lp fetch [options]
 
 Availalbe options:
     --cache bzr-url: cache upstream repository with data from bzr-url
+    --force: force export, helps if the export failed and stuff seems stuck
 
 Download project repository from Launchpad.net
 
@@ -261,6 +262,7 @@ EOM
 function gitlp_fetch() {
 # Lookup the bzr branch associated with the project
 local cache=""
+local force=""
 while test -n "$1"; do
     case "$1" in
         --usage)
@@ -275,6 +277,10 @@ while test -n "$1"; do
             cache="$2"
             shift
             test $# -gt 0 && shift
+            ;;
+        -f|--force)
+            force="1"
+            shift
             ;;
         ^--$)
             shift
@@ -337,7 +343,7 @@ else
         gitlp_error "unable to pull from $upstream_branch"
     fi
 fi
-if [ "$old_revno" != "$new_revno" ]; then
+if [ "$old_revno" != "$new_revno" ] || [ "$force" = 1 ]; then
     # Mirror everything into git 
     echo "Exporting project history from Bazaar into Git..."
     bzr fast-export \
