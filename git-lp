@@ -1,10 +1,10 @@
 #!/bin/bash
-# Copyright 2012, 2013 Canonical Ltd.
+# Copyright 2012-2014 Canonical Ltd.
 # git-lp -- launchpad collaboration tool for git users
 # Written by Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
 # Licensed under 3-clause BSD license, see COPYING for details
 
-gitlp_version='0.2'
+gitlp_version='0.3'
 
 
 function gitlp_error() {
@@ -67,6 +67,9 @@ Typical workflow:
     # You may need to pass --overwrite to push if you've been rewriting history
     $ git lp push --overwrite
 
+    # This will open a browser page with your branch
+    $ git lp open
+
     # After ther branch is merged upstream (for example, by using tarmac) you
     # can remove the your local branch. You need to use -D as bzr merges don't
     # record well in git and apparently git is unable to determine that.
@@ -103,7 +106,7 @@ to be maintained anymore.
 
 *** DISCLAIMER ***
 
-I wrote gitl-lp as I had issues with existing solutions of similar kind
+I wrote git-lp as I had issues with existing solutions of similar kind
 (git-bzr, git-bzr-ng) that tripped over bugs in bzr-fastimport. Over time I
 found a subset of operations that seems to work reliably _for me_.
 
@@ -233,6 +236,7 @@ Usage: git lp fetch [options]
 
 Availalbe options:
     --cache bzr-url: cache upstream repository with data from bzr-url
+    --force: force export, helps if the export failed and stuff seems stuck
 
 Download project repository from Launchpad.net
 
@@ -258,6 +262,7 @@ EOM
 function gitlp_fetch() {
 # Lookup the bzr branch associated with the project
 local cache=""
+local force=""
 while test -n "$1"; do
     case "$1" in
         --usage)
@@ -272,6 +277,10 @@ while test -n "$1"; do
             cache="$2"
             shift
             test $# -gt 0 && shift
+            ;;
+        -f|--force)
+            force="1"
+            shift
             ;;
         ^--$)
             shift
@@ -334,7 +343,7 @@ else
         gitlp_error "unable to pull from $upstream_branch"
     fi
 fi
-if [ "$old_revno" != "$new_revno" ]; then
+if [ "$old_revno" != "$new_revno" ] || [ "$force" = 1 ]; then
     # Mirror everything into git 
     echo "Exporting project history from Bazaar into Git..."
     bzr fast-export \
@@ -506,6 +515,9 @@ case "$mode" in
             rm -f ".git/launchpad/bzr.${branch}.marks"
             gitlp_error "Unable to create bzr branch!"
         fi
+        # Set the upstream branch
+        # TODO: --set-upstream is deprecated and will be replaced by --set-upstream-to
+        git branch --set-upstream "launchpad/$branch" launchpad/+upstream 2>/dev/null
         # Copy mark files
         cp ".git/launchpad/git.+upstream.marks" ".git/launchpad/git.${branch}.marks"
         cp ".git/launchpad/bzr.+upstream.marks" ".git/launchpad/bzr.${branch}.marks"
@@ -633,6 +645,44 @@ bzr push \
 }
 
 
+function get_full_branch() {
+# Ensure we have git+launchpad integration
+gitlp_ensure_tracked
+local project=$(git config --local --get launchpad.project)
+local branch=$(git symbolic-ref -q HEAD | sed -e 's!^refs/heads/!!' )
+if [ -z "$branch" ]; then
+    gitlp_error "unable to guess branch (no current branch)"
+fi
+branch="${branch##launchpad/}"
+if [ -z "$branch" ]; then
+    gitlp_error "only launchpad/* branches are supported"
+fi
+local full_lp_branch="lp:~$(bzr lp-login)/$project/$branch"
+echo $full_lp_branch
+}
+
+
+function gitlp_open_usage() {
+cat << EOM
+Usage: git lp open
+EOM
+}
+
+
+function gitlp_open_help() {
+gitlp_open_usage
+cat << EOM
+Open Launchpad branch web page for the current branch on your browser.
+EOM
+}
+
+
+function gitlp_open() {
+local full_lp_branch=$(get_full_branch)
+bzr lp-open $full_lp_branch
+}
+
+
 function gitlp_patch() {
 cat << EOM
 To patch bzr execute the following command as root.
@@ -688,6 +738,7 @@ Commands:
     push        Push current launchpad/ branch to Launchpad.net
     gc          Remove unused bzr branches and meta-data
     rebase      Rebase on +upstream and update internal meta-data
+    open        Open the current branch on Launchpad
 
 Special commands:
 
@@ -739,7 +790,7 @@ case "$cmd" in
         eval set -- "${FLAGS_ARGV}"
         gitlp_${cmd}
         ;;
-    tutorial|disclaimer|init|fetch|branch|push|patch)
+    tutorial|disclaimer|init|fetch|branch|push|patch|open)
         # Peek if the user passed --help as the first argument
         # If not then just run the command normally
         case "$1" in 
