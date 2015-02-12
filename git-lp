@@ -79,6 +79,8 @@ Typical workflow:
     # command. Pass the --remove option to actually remove stuff from your
     # filesystem.
     $ git lp gc --remove
+
+For more details, refer to the wiki: https://github.com/zyga/git-lp/wiki
 EOM
 }
 
