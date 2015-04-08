@@ -7,6 +7,33 @@
 gitlp_version='0.3'
 
 
+function checksum_bzrlib() {
+# Perform md5 checksum of bzrlib/index.py to see if has been patched
+local bzrlib_bad_checksum=0
+local bzrlib_path=`exec python -c "import bzrlib; print bzrlib.__file__"`
+local bzrlib_path=$(dirname "${bzrlib_path}")
+local bzrlib_index="${bzrlib_path}/index.py"
+local checksum=$(md5sum ${bzrlib_index} | cut -f1 -d" ")
+
+case $checksum in
+    a4a8558d3c74ca226fbbbbd388d26294)
+        ;;
+    *)
+    bzrlib_bad_checksum=1
+esac
+
+# Abort if bzr has not been patched
+if [ $bzrlib_bad_checksum -eq 1 ]; then
+cat <<EOM
+ERROR: bzr has not been patched.
+Please check the installation instructions on the wiki:
+https://github.com/zyga/git-lp/wiki#installation
+EOM
+exit 1
+fi
+}
+
+
 function gitlp_error() {
 echo "git-lp: error: $@"
 exit 1
@@ -752,6 +779,11 @@ EOM
 function gitlp_main() {
 cmd="$1"
 shift
+
+# Check that bzr has been patched
+checksum_bzrlib
+
+
 # Dispatch the command
 case "$cmd" in
     ''|help|-h|--help|-\?)
