@@ -18,6 +18,9 @@ local checksum=$(md5sum ${bzrlib_index} | cut -f1 -d" ")
 case $checksum in
     a4a8558d3c74ca226fbbbbd388d26294)
         ;;
+    be697c0baccfae2641fd1ed036e96334)
+        # Ubuntu 15.10 2.6.0+bzr6602-2ubuntu2
+        ;;
     *)
     bzrlib_bad_checksum=1
 esac
