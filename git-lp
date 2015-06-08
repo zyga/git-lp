@@ -10,7 +10,7 @@ gitlp_version='0.3'
 function checksum_bzrlib() {
 # Perform md5 checksum of bzrlib/index.py to see if has been patched
 local bzrlib_bad_checksum=0
-local bzrlib_path=`exec python -c "import bzrlib; print bzrlib.__file__"`
+local bzrlib_path=`exec /usr/bin/python -c "import bzrlib; print bzrlib.__file__"`
 local bzrlib_path=$(dirname "${bzrlib_path}")
 local bzrlib_index="${bzrlib_path}/index.py"
 local checksum=$(md5sum ${bzrlib_index} | cut -f1 -d" ")
