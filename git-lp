@@ -16,7 +16,7 @@ local bzrlib_index="${bzrlib_path}/index.py"
 local checksum=$(md5sum ${bzrlib_index} | cut -f1 -d" ")
 
 case $checksum in
-    a4a8558d3c74ca226fbbbbd388d26294)
+    a4a8558d3c74ca226fbbbbd388d26294|917f04f90bc54f1ef6fd45c7f62544ce)
         ;;
     be697c0baccfae2641fd1ed036e96334)
         # Ubuntu 15.10 2.6.0+bzr6602-2ubuntu2
