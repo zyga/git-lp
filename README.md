@@ -55,3 +55,12 @@ should apply cleanly to packaged versions as well.
 3. Put git-lp (https://raw.github.com/zyga/git-lp/master/git-lp) somewhere in
    your PATH.
 4. Install bzr-fastimport (sudo apt-get install bzr-fastimport)
+   If you're using Ubuntu 15.10 or newer, chances are that bzr-fastimport is
+   not available in the archive. You can install it as a local plugin by
+   running:
+
+        $ mkdir -p ~/.bazaar/plugins
+        $ bzr branch lp:bzr-fastimport ~/.bazaar/plugins/fastimport
+
+   Make sure that python-fastimport is installed (sudo apt-get install
+   python-fastimport)
