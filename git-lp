@@ -378,13 +378,13 @@ fi
 if [ "$old_revno" != "$new_revno" ] || [ "$force" = 1 ]; then
     # Mirror everything into git 
     echo "Exporting project history from Bazaar into Git..."
-    bzr fast-export \
+    (bzr fast-export \
         --quiet \
         --plain \
         --marks .git/launchpad/bzr.+upstream.marks \
         --git-branch launchpad/+upstream \
         .git/launchpad/repo/+upstream 2>/dev/null \
-        || gitlp_error "bzr fast-export failed" \
+        || gitlp_error "bzr fast-export failed") \
         | git fast-import \
         --quiet \
         --import-marks-if-exists=.git/launchpad/git.+upstream.marks \
